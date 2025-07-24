@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 480px;
+            margin: 48px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 32px 24px;
+        }
+        h1 {
+            font-weight: 600;
+            font-size: 2rem;
+            margin-bottom: 24px;
+            color: #22223b;
+            text-align: center;
+        }
+        .input-area {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        #task-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+        #task-input:focus {
+            border-color: #4f46e5;
+        }
+        #add-task-btn {
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #add-task-btn:hover {
+            background: #3730a3;
+        }
+        #task-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #task-table th, #task-table td {
+            padding: 12px 8px;
+            text-align: left;
+        }
+        #task-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #374151;
+        }
+        #task-table tbody tr {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        #task-table tbody tr:last-child {
+            border-bottom: none;
+        }
+        .action-btn {
+            background: none;
+            border: none;
+            color: #4f46e5;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            transition: color 0.2s;
+        }
+        .action-btn:last-child {
+            margin-right: 0;
+        }
+        .action-btn:hover {
+            color: #dc2626;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 16px 6px;
+            }
+            h1 {
+                font-size: 1.3rem;
+            }
+            #task-table th, #task-table td {
+                padding: 8px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>My To-Do List</h1>
+        <div class="input-area">
+            <input type="text" id="task-input" placeholder="Add a new task...">
+            <button id="add-task-btn">Add</button>
+        </div>
+        <table id="task-table">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="task-list">
+            </tbody>
+        </table>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

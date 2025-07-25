@@ -5,14 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskList = document.getElementById('task-list');
     const taskDueDate = document.getElementById('task-due-date');
     const taskDueTime = document.getElementById('task-due-time');
-    // --- MODIFICATION START ---
     const taskPriority = document.getElementById('task-priority');
-    // --- MODIFICATION END ---
 
     function showError(message) {
         alert(message);
     }
 
+    // --- Main Fetch and Render ---
     async function fetchTasks() {
         try {
             const response = await fetch(API_URL);
@@ -30,63 +29,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTask(task) {
-        const tr = document.createElement('tr');
-        tr.className = 'task-item';
-        tr.dataset.id = task._id;
-
-        // --- MODIFICATION START ---
-        // Add a class based on the task's priority
-        const priority = task.priority || 'medium'; // Default to medium if not set
-        tr.classList.add(`priority-${priority}`);
-        // --- MODIFICATION END ---
-
+        const priority = task.priority || 'medium';
         const now = new Date();
         const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+        
+        const taskElement = document.createElement('div');
+        taskElement.className = `task-item priority-${priority}`;
+        taskElement.dataset.id = task._id;
 
-        if (task.completed) {
-            tr.classList.add('completed');
-        } else if (dueDate && dueDate < now) {
-            tr.classList.add('overdue');
-        }
+        if (task.completed) taskElement.classList.add('completed');
+        if (!task.completed && dueDate && dueDate < now) taskElement.classList.add('overdue');
 
-        const formattedDueDate = dueDate
-            ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-            : 'No due date';
+        const formattedDueDate = dueDate ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not set';
 
-        tr.innerHTML = `
-            <td><span class="complete-btn" title="Mark as complete">✔</span></td>
-            <td><span class="text">${escapeHtml(task.text)}</span></td>
-            <td class="due-date-cell">${formattedDueDate}</td>
-            <td><span class="priority-label">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></td>
-            <td class="actions"><button class="delete-btn" title="Delete Task">❌</button></td>
+        // Render Subtasks
+        const subtasks = task.subtasks || [];
+        const subtasksHtml = `
+            <div class="subtask-list">
+                ${subtasks.map(st => `
+                    <div class="subtask-item ${st.completed ? 'completed' : ''}" data-subtask-id="${st._id}">
+                        <span class="subtask-complete-btn">✔</span>
+                        <span class="subtask-text">${escapeHtml(st.text)}</span>
+                        <button class="subtask-delete-btn">❌</button>
+                    </div>
+                `).join('')}
+            </div>
         `;
-        taskList.appendChild(tr);
-    }
 
-    function escapeHtml(str) {
-        return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        taskElement.innerHTML = `
+            <div class="task-main-content">
+                <span class="task-complete-btn">✔</span>
+                <div class="task-details">
+                    <span class="task-text">${escapeHtml(task.text)}</span>
+                </div>
+                <span class="task-duedate">${formattedDueDate}</span>
+                <span class="task-priority"><span class="priority-label">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></span>
+                <div class="task-actions">
+                    <button class="add-subtask-btn">Subtask +</button>
+                    <button class="task-delete-btn">❌</button>
+                </div>
+            </div>
+            <div class="subtask-container">
+                ${subtasksHtml}
+                <div class="add-subtask-form" style="display:none;">
+                    <input type="text" class="subtask-input" placeholder="New subtask...">
+                    <button class="save-subtask-btn">Save</button>
+                </div>
+            </div>
+        `;
+        taskList.appendChild(taskElement);
     }
-
+    
+    // --- API Call Functions ---
     async function addTask() {
         const taskText = taskInput.value.trim();
-        if (!taskText) {
-            showError('Task cannot be empty!');
-            return;
-        }
+        if (!taskText) return showError('Task text cannot be empty!');
 
-        const taskData = {
-            text: taskText,
-            // --- MODIFICATION START ---
-            priority: taskPriority.value
-            // --- MODIFICATION END ---
-        };
-
+        const taskData = { text: taskText, priority: taskPriority.value };
         const dueDate = taskDueDate.value;
         const dueTime = taskDueTime.value;
-        if (dueDate && dueTime) {
-            taskData.dueDate = new Date(`${dueDate}T${dueTime}`).toISOString();
-        } else if (dueDate) {
-            taskData.dueDate = new Date(dueDate).toISOString();
+        if (dueDate) {
+            taskData.dueDate = new Date(`${dueDate}T${dueTime || '00:00'}`).toISOString();
         }
 
         try {
@@ -96,57 +99,89 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(taskData)
             });
             if (!response.ok) throw new Error('Failed to add task');
-            const newTask = await response.json();
-            renderTask(newTask);
+            await fetchTasks(); // Full refresh
             // Clear inputs
             taskInput.value = '';
             taskDueDate.value = '';
             taskDueTime.value = '';
             taskPriority.value = 'medium';
             taskInput.focus();
-        } catch (error) {
-            showError(error.message);
-        }
+        } catch (error) { showError(error.message); }
     }
 
-    async function handleTaskClick(event) {
+    async function saveSubtask(taskId, inputElement) {
+        const text = inputElement.value.trim();
+        if (!text) return showError('Subtask text cannot be empty');
+
+        try {
+            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            if (!response.ok) throw new Error('Failed to add subtask');
+            await fetchTasks();
+        } catch (error) { showError(error.message); }
+    }
+
+    async function toggleCompletion(taskId, subtaskId = null) {
+        const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
+        try {
+            const response = await fetch(url, { method: 'PUT' });
+            if (!response.ok) throw new Error('Failed to update status');
+            await fetchTasks();
+        } catch (error) { showError(error.message); }
+    }
+
+    async function deleteTask(taskId, subtaskId = null) {
+        const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
+        const confirmation = confirm(`Are you sure you want to delete this ${subtaskId ? 'subtask' : 'task and all its subtasks'}?`);
+        if (!confirmation) return;
+        
+        try {
+            const response = await fetch(url, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete');
+            await fetchTasks();
+        } catch (error) { showError(error.message); }
+    }
+
+    // --- Event Handling ---
+    taskList.addEventListener('click', (event) => {
         const target = event.target;
         const taskItem = target.closest('.task-item');
         if (!taskItem) return;
         const taskId = taskItem.dataset.id;
-
-        if (target.classList.contains('delete-btn')) {
-            await deleteTask(taskId, taskItem);
-        } else if (target.matches('.complete-btn, .text')) {
-            await toggleTaskCompletion(taskId);
+        
+        // Main Task Actions
+        if (target.classList.contains('task-complete-btn')) toggleCompletion(taskId);
+        if (target.classList.contains('task-delete-btn')) deleteTask(taskId);
+        
+        // Subtask Form
+        if (target.classList.contains('add-subtask-btn')) {
+            const form = taskItem.querySelector('.add-subtask-form');
+            form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+            form.querySelector('.subtask-input').focus();
         }
-    }
-
-    async function deleteTask(taskId, taskItem) {
-        try {
-            const response = await fetch(`${API_URL}/${taskId}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Failed to delete task');
-            taskItem.remove();
-        } catch (error) {
-            showError('Could not delete task.');
+        if (target.classList.contains('save-subtask-btn')) {
+            const input = taskItem.querySelector('.subtask-input');
+            saveSubtask(taskId, input);
         }
-    }
 
-    async function toggleTaskCompletion(taskId) {
-        try {
-            const response = await fetch(`${API_URL}/${taskId}`, { method: 'PUT' });
-            if (!response.ok) throw new Error('Failed to update task');
-            await fetchTasks(); // Re-fetch all tasks to ensure UI is consistent
-        } catch (error) {
-            showError('Could not update task.');
+        // Subtask Actions
+        const subtaskItem = target.closest('.subtask-item');
+        if (subtaskItem) {
+            const subtaskId = subtaskItem.dataset.subtaskId;
+            if (target.classList.contains('subtask-complete-btn')) toggleCompletion(taskId, subtaskId);
+            if (target.classList.contains('subtask-delete-btn')) deleteTask(taskId, subtaskId);
         }
-    }
+    });
 
     addTaskBtn.addEventListener('click', addTask);
-    taskInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addTask();
-    });
-    taskList.addEventListener('click', handleTaskClick);
+    taskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addTask());
 
-    fetchTasks();
+    function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+    
+    fetchTasks(); // Initial Load
 });

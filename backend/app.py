@@ -1,104 +1,106 @@
-from flask import Flask, request, jsonify, send_from_directory, Blueprint, render_template
-from pymongo import MongoClient
-from bson import ObjectId
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_from_directory, Blueprint
 import json
 import os
+import uuid
 
-# --- Create Flask App and configure paths ---
-# Determine the absolute path to the frontend directory
+# --- Configuration ---
 backend_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(backend_dir, '..', 'frontend')
+TASKS_FILE = os.path.join(backend_dir, 'tasks.json')
 
-# Serve static files from the 'frontend' directory, and set the template folder
-app = Flask(__name__, 
-            static_folder=frontend_dir, 
-            template_folder=frontend_dir,
-            static_url_path='') # Serve static files from the root
-CORS(app)
+# --- Create Flask App ---
+app = Flask(
+    __name__,
+    static_folder=frontend_dir,
+    template_folder=frontend_dir,
+    static_url_path=''
+)
 
-# --- Custom JSON Encoder to handle MongoDB's ObjectId ---
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        return super().default(o)
+# --- Helper Functions for Local DB ---
 
-app.json_encoder = JSONEncoder
+def read_tasks():
+    """Reads the list of tasks from the JSON file."""
+    if not os.path.exists(TASKS_FILE):
+        return []
+    try:
+        with open(TASKS_FILE, 'r') as f:
+            return json.load(f)
+    except (IOError, json.JSONDecodeError):
+        return []
 
-# --- MongoDB Connection ---
-MONGO_URI = "mongodb+srv://abhijithpramod25:IeM36IuFHeV5sWKV@cluster0.ky61m3p.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-client = MongoClient(MONGO_URI)
-db = client['todolist_db']
-tasks_collection = db['tasks']
+def write_tasks(tasks):
+    """Writes the list of tasks to the JSON file."""
+    try:
+        with open(TASKS_FILE, 'w') as f:
+            json.dump(tasks, f, indent=4)
+    except IOError as e:
+        print(f"Error writing to tasks file: {e}")
 
 # --- API Blueprint ---
-# Create a Blueprint object. All routes defined with this object will be prefixed with /api
 api = Blueprint('api', __name__, url_prefix='/api')
 
 @api.route('/tasks', methods=['GET', 'POST'])
 def handle_tasks():
-    """Handles both fetching and adding tasks to the database."""
     if request.method == 'POST':
-        # Logic to ADD a new task
         task_data = request.get_json()
         if not task_data or 'text' not in task_data or not task_data['text'].strip():
             return jsonify({'error': 'Task text cannot be empty'}), 400
-        
-        result = tasks_collection.insert_one({
+
+        tasks = read_tasks()
+        new_task = {
+            '_id': str(uuid.uuid4()),  # Generate a unique ID
             'text': task_data['text'].strip(),
             'completed': False
-        })
-        new_task = tasks_collection.find_one({'_id': result.inserted_id})
+        }
+        tasks.append(new_task)
+        write_tasks(tasks)
         return jsonify(new_task), 201
-    else:
-        # Logic to GET all tasks
-        tasks = list(tasks_collection.find({}))
+    else: # GET
+        tasks = read_tasks()
         return jsonify(tasks)
 
 @api.route('/tasks/<task_id>', methods=['PUT'])
 def update_task(task_id):
-    """Toggles the completed status of a task."""
-    try:
-        obj_id = ObjectId(task_id)
-    except Exception:
-        return jsonify({'error': 'Invalid task ID format'}), 400
-
-    task = tasks_collection.find_one({'_id': obj_id})
-    if task:
-        new_status = not task.get('completed', False)
-        tasks_collection.update_one({'_id': obj_id}, {'$set': {'completed': new_status}})
+    tasks = read_tasks()
+    task_found = None
+    for task in tasks:
+        if task['_id'] == task_id:
+            task['completed'] = not task.get('completed', False)
+            task_found = task
+            break
+    
+    if task_found:
+        write_tasks(tasks)
         return jsonify({'message': 'Task updated successfully'}), 200
+    
     return jsonify({'error': 'Task not found'}), 404
 
 @api.route('/tasks/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    """Deletes a task from the database."""
-    try:
-        obj_id = ObjectId(task_id)
-    except Exception:
-        return jsonify({'error': 'Invalid task ID format'}), 400
-        
-    result = tasks_collection.delete_one({'_id': obj_id})
-    if result.deleted_count == 1:
+    tasks = read_tasks()
+    original_length = len(tasks)
+    # Filter out the task to be deleted
+    tasks = [task for task in tasks if task['_id'] != task_id]
+    
+    if len(tasks) < original_length:
+        write_tasks(tasks)
         return jsonify({'message': 'Task deleted successfully'}), 200
+    
     return jsonify({'error': 'Task not found'}), 404
 
-# Register the blueprint with the main Flask app
 app.register_blueprint(api)
 
 # --- Route to serve the main application ---
-# This will catch all non-API routes and serve the main HTML page.
-# The frontend router will then handle the specific URL.
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+    file_path = os.path.join(app.static_folder, path)
+    if path != "" and os.path.exists(file_path) and os.path.isfile(file_path):
         return send_from_directory(app.static_folder, path)
-    else:
-        return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
-
-# --- Start Server ---
 if __name__ == '__main__':
+    # Create the tasks file if it doesn't exist
+    if not os.path.exists(TASKS_FILE):
+        write_tasks([])
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -8,132 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            background: #f6f8fa;
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-            padding: 32px 28px 24px 28px;
-        }
-        h1 {
-            font-weight: 700;
-            font-size: 2rem;
-            margin-bottom: 24px;
-            color: #222;
-            text-align: center;
-        }
-        .input-area {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-        }
-        .input-area input,
-        .input-area select {
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .input-area input:focus,
-        .input-area select:focus {
-            border-color: #6366f1;
-        }
-        #add-task-btn {
-            background: #6366f1;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        #add-task-btn:hover {
-            background: #4f46e5;
-        }
-        .task-list-header {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            font-weight: 600;
-            color: #6366f1;
-            padding: 8px 0;
-            border-bottom: 2px solid #e5e7eb;
-            margin-bottom: 8px;
-            font-size: 1rem;
-        }
-        #task-list {
-            margin-top: 8px;
-        }
-        .task-item {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #e5e7eb;
-            font-size: 1rem;
-            transition: background 0.2s;
-        }
-        .task-item:last-child {
-            border-bottom: none;
-        }
-        .task-priority-high {
-            color: #ef4444;
-            font-weight: 700;
-        }
-        .task-priority-medium {
-            color: #f59e42;
-            font-weight: 600;
-        }
-        .task-priority-low {
-            color: #10b981;
-            font-weight: 600;
-        }
-        .task-actions button {
-            background: #e5e7eb;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 12px;
-            margin-right: 6px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            transition: background 0.2s;
-        }
-        .task-actions button:last-child {
-            margin-right: 0;
-        }
-        .task-actions button:hover {
-            background: #6366f1;
-            color: #fff;
-        }
-        @media (max-width: 600px) {
-            .container {
-                padding: 16px 8px;
-            }
-            .task-list-header, .task-item {
-                grid-template-columns: 1.5fr 1fr 1fr 1fr;
-                font-size: 0.95rem;
-            }
-            .input-area {
-                flex-direction: column;
-                gap: 8px;
-            }
-        }
-    </style>
 </head>
 <body>
     <div class="container">
-        <h1>My To-Do List</h1>
+        <div class="header-section">
+            <h1>My To-Do List</h1>
+            <button id="theme-toggle-btn">☀️</button>
+        </div>
         <div class="input-area">
             <input type="text" id="task-input" placeholder="Add a new task...">
             <input type="date" id="task-due-date">

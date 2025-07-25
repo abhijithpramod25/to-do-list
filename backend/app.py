@@ -41,10 +41,12 @@ def handle_tasks():
             '_id': str(uuid.uuid4()),
             'text': task_data['text'].strip(),
             'completed': False,
-            'priority': task_data.get('priority', 'medium'),
-            'subtasks': []  # <-- Initialize with empty subtasks list
+            'subtasks': [],
+            # --- MODIFICATION ---
+            'priority': task_data.get('priority', 'medium')
+            # --- MODIFICATION END ---
         }
-
+        
         if 'dueDate' in task_data and task_data['dueDate']:
             new_task['dueDate'] = task_data['dueDate']
 
@@ -57,10 +59,10 @@ def handle_tasks():
 
 @api.route('/tasks/<task_id>', methods=['PUT', 'DELETE'])
 def handle_single_task(task_id):
+    # This function remains unchanged
     tasks = read_tasks()
     task = next((t for t in tasks if t.get('_id') == task_id), None)
     if not task: return jsonify({'error': 'Task not found'}), 404
-
     if request.method == 'PUT':
         task['completed'] = not task.get('completed', False)
         write_tasks(tasks)
@@ -70,43 +72,32 @@ def handle_single_task(task_id):
         write_tasks(tasks)
         return '', 204
 
-# --- NEW: Subtask Routes ---
-
+# --- Subtask Routes ---
 @api.route('/tasks/<task_id>/subtasks', methods=['POST'])
 def add_subtask(task_id):
+    # This function remains unchanged
     data = request.get_json()
-    if not data or not data.get('text', '').strip():
-        return jsonify({'error': 'Subtask text cannot be empty'}), 400
-
+    if not data or not data.get('text', '').strip(): return jsonify({'error': 'Subtask text cannot be empty'}), 400
     tasks = read_tasks()
     task = next((t for t in tasks if t.get('_id') == task_id), None)
     if not task: return jsonify({'error': 'Parent task not found'}), 404
-
-    new_subtask = {
-        '_id': str(uuid.uuid4()),
-        'text': data['text'].strip(),
-        'completed': False
-    }
-    
+    new_subtask = {'_id': str(uuid.uuid4()), 'text': data['text'].strip(), 'completed': False}
     task.setdefault('subtasks', []).append(new_subtask)
     write_tasks(tasks)
     return jsonify(new_subtask), 201
 
-
 @api.route('/tasks/<task_id>/subtasks/<subtask_id>', methods=['PUT', 'DELETE'])
 def handle_single_subtask(task_id, subtask_id):
+    # This function remains unchanged
     tasks = read_tasks()
     task = next((t for t in tasks if t.get('_id') == task_id), None)
     if not task: return jsonify({'error': 'Parent task not found'}), 404
-    
     subtask = next((st for st in task.get('subtasks', []) if st.get('_id') == subtask_id), None)
     if not subtask: return jsonify({'error': 'Subtask not found'}), 404
-
     if request.method == 'PUT':
         subtask['completed'] = not subtask.get('completed', False)
         write_tasks(tasks)
         return jsonify(subtask)
-    
     elif request.method == 'DELETE':
         task['subtasks'] = [st for st in task.get('subtasks', []) if st.get('_id') != subtask_id]
         write_tasks(tasks)

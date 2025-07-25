@@ -1,151 +1,159 @@
+/* --- General Body and Container Styles --- */
 body {
-    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%);
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    padding-top: 60px;
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
     margin: 0;
+    padding: 20px;
 }
 
 .container {
+    max-width: 800px;
+    margin: 40px auto;
     background: #fff;
-    padding: 36px 32px 32px 32px;
-    border-radius: 16px;
-    box-shadow: 0 6px 24px rgba(60, 72, 88, 0.10), 0 1.5px 4px rgba(60, 72, 88, 0.04);
-    width: 100%;
-    max-width: 500px;
-    transition: box-shadow 0.2s;
-}
-
-.container:hover {
-    box-shadow: 0 12px 40px rgba(60, 72, 88, 0.16), 0 2px 8px rgba(60, 72, 88, 0.06);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 h1 {
     text-align: center;
-    color: #232946;
-    font-size: 2.2rem;
-    letter-spacing: 1px;
+    color: #2a2a2a;
     margin-bottom: 20px;
-    font-weight: 700;
 }
 
+/* --- Input Area --- */
 .input-area {
     display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: center;
 }
 
-#task-input {
-    flex-grow: 1;
-    padding: 12px 14px;
-    border: 1.5px solid #e0e7ef;
-    border-radius: 7px;
-    font-size: 1.05rem;
-    background: #f7fafd;
-    transition: border-color 0.2s, box-shadow 0.2s;
+/* Common style for all input fields and select */
+#task-input,
+#task-due-date,
+#task-due-time,
+#task-priority {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1em;
+    font-family: 'Inter', sans-serif;
+    background-color: #fff;
+    box-sizing: border-box;
 }
 
-#task-input:focus {
-    outline: none;
-    border-color: #4f46e5;
-    background: #fff;
-    box-shadow: 0 0 0 2px #e0e7ff;
-}
+#task-input { flex-grow: 1; }
+#task-due-date { width: 140px; }
+#task-due-time { width: 100px; }
+#task-priority { width: 150px; } /* --- NEW --- */
 
 #add-task-btn {
-    padding: 12px 26px;
-    border: none;
-    background: linear-gradient(90deg, #4f46e5 0%, #2563eb 100%);
-    color: #fff;
-    border-radius: 7px;
+    padding: 10px 20px;
+    background-color: #5cb85c;
+    color: white;
+    border: 1px solid #5cb85c;
+    border-radius: 5px;
     cursor: pointer;
-    font-size: 1.05rem;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.07);
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    font-size: 1em;
+    box-sizing: border-box;
+    transition: background-color 0.3s;
 }
 
-#add-task-btn:hover, #add-task-btn:focus {
-    background: linear-gradient(90deg, #3730a3 0%, #1e40af 100%);
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.12);
-    transform: translateY(-2px) scale(1.03);
-    outline: none;
+#add-task-btn:hover {
+    background-color: #4cae4c;
+    border-color: #4cae4c;
 }
 
+/* --- Task Table --- */
 #task-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     margin-top: 20px;
-    background: #f9fafb;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(60, 72, 88, 0.05);
 }
 
-#task-table th, #task-table td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #e5e7eb;
+#task-table th,
+#task-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #eee;
     text-align: left;
-    font-size: 1.02rem;
+    vertical-align: middle;
 }
 
 #task-table th {
-    background: #f3f4f6;
-    font-weight: 700;
-    color: #232946;
-    letter-spacing: 0.5px;
+    background-color: #f9f9f9;
+    font-weight: 600;
 }
 
-#task-table tr:last-child td {
-    border-bottom: none;
-}
-
-.task-item .text {
-    cursor: pointer;
-    transition: color 0.2s;
-    color: #232946;
-}
-
+/* --- Individual Task Items --- */
+.task-item .text { cursor: pointer; }
 .task-item.completed .text {
     text-decoration: line-through;
-    color: #b0b3c6;
+    color: #aaa;
 }
 
-.task-item .actions button {
-    border: none;
-    background: none;
+.complete-btn {
     cursor: pointer;
-    font-size: 1.2rem;
-    margin-left: 10px;
-    color: #6366f1;
-    transition: transform 0.2s, color 0.2s;
-    border-radius: 4px;
-    padding: 4px 6px;
-}
-
-.task-item .actions button:hover, .task-item .actions button:focus {
-    transform: scale(1.15);
-    color: #1d4ed8;
-    background: #e0e7ff;
-    outline: none;
-}
-
-/* Professional Navigation Bar Style for Date and Time */
-#datetime-container {
+    font-size: 1.2em;
+    color: #ccc;
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
     text-align: center;
-    font-size: 1.1rem;
-    color: #374151;
-    background: linear-gradient(90deg, #f3f4f6 0%, #e0e7ff 100%);
-    padding: 16px 0;
-    margin: -36px -32px 32px -32px;
-    border-bottom: 1.5px solid #dbeafe;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-    box-shadow: 0 1px 4px rgba(60, 72, 88, 0.04);
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    transition: all 0.3s;
 }
+
+.task-item.completed .complete-btn {
+    background-color: #5cb85c;
+    border-color: #5cb85c;
+    color: white;
+}
+
+.task-item .actions { text-align: right; }
+
+.delete-btn {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 1.2em;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+.task-item:hover .delete-btn { opacity: 1; }
+
+.due-date-cell {
+    font-size: 0.9em;
+    color: #666;
+    white-space: nowrap;
+}
+
+.task-item.overdue .due-date-cell {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+/* --- MODIFICATION START --- */
+/* Priority Styling */
+.task-item {
+    border-left: 5px solid transparent; /* Default border */
+}
+.task-item.priority-high { border-left-color: #e74c3c; } /* Red */
+.task-item.priority-medium { border-left-color: #f39c12; } /* Orange */
+.task-item.priority-low { border-left-color: #3498db; } /* Blue */
+
+.priority-label {
+    font-size: 0.9em;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #fff;
+}
+.priority-high .priority-label { background-color: #e74c3c; }
+.priority-medium .priority-label { background-color: #f39c12; }
+.priority-low .priority-label { background-color: #3498db; }
+/* --- MODIFICATION END --- */

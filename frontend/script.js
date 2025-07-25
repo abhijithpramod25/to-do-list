@@ -1,194 +1,152 @@
-    document.addEventListener('DOMContentLoaded', () => {
-        const API_URL = '/api/tasks';
-        const taskInput = document.getElementById('task-input');
-        const addTaskBtn = document.getElementById('add-task-btn');
-        const taskList = document.getElementById('task-list');
-        const datetimeContainer = document.getElementById('datetime-container');
-        const errorContainer = document.getElementById('error-container');
+document.addEventListener('DOMContentLoaded', () => {
+    const API_URL = '/api/tasks';
+    const taskInput = document.getElementById('task-input');
+    const addTaskBtn = document.getElementById('add-task-btn');
+    const taskList = document.getElementById('task-list');
+    const taskDueDate = document.getElementById('task-due-date');
+    const taskDueTime = document.getElementById('task-due-time');
+    // --- MODIFICATION START ---
+    const taskPriority = document.getElementById('task-priority');
+    // --- MODIFICATION END ---
 
-        /**
-         * Display an error message in the UI.
-         * @param {string} message
-         */
-        function showError(message) {
-            if (errorContainer) {
-                errorContainer.textContent = message;
-                errorContainer.style.display = 'block';
-                setTimeout(() => {
-                    errorContainer.style.display = 'none';
-                }, 3000);
-            } else {
-                alert(message);
-            }
+    function showError(message) {
+        alert(message);
+    }
+
+    async function fetchTasks() {
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) throw new Error('Failed to fetch tasks');
+            const tasks = await response.json();
+            renderTaskList(tasks);
+        } catch (error) {
+            showError(error.message);
+        }
+    }
+
+    function renderTaskList(tasks) {
+        taskList.innerHTML = '';
+        tasks.forEach(renderTask);
+    }
+
+    function renderTask(task) {
+        const tr = document.createElement('tr');
+        tr.className = 'task-item';
+        tr.dataset.id = task._id;
+
+        // --- MODIFICATION START ---
+        // Add a class based on the task's priority
+        const priority = task.priority || 'medium'; // Default to medium if not set
+        tr.classList.add(`priority-${priority}`);
+        // --- MODIFICATION END ---
+
+        const now = new Date();
+        const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+
+        if (task.completed) {
+            tr.classList.add('completed');
+        } else if (dueDate && dueDate < now) {
+            tr.classList.add('overdue');
         }
 
-        /**
-         * Update the date and time in the UI.
-         */
-        function updateDateTime() {
-            const now = new Date();
-            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            const date = now.toLocaleDateString(undefined, dateOptions);
-            const time = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            if (datetimeContainer) {
-                datetimeContainer.textContent = `${date} | ${time}`;
-            }
+        const formattedDueDate = dueDate
+            ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+            : 'No due date';
+
+        tr.innerHTML = `
+            <td><span class="complete-btn" title="Mark as complete">✔</span></td>
+            <td><span class="text">${escapeHtml(task.text)}</span></td>
+            <td class="due-date-cell">${formattedDueDate}</td>
+            <td><span class="priority-label">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></td>
+            <td class="actions"><button class="delete-btn" title="Delete Task">❌</button></td>
+        `;
+        taskList.appendChild(tr);
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    async function addTask() {
+        const taskText = taskInput.value.trim();
+        if (!taskText) {
+            showError('Task cannot be empty!');
+            return;
         }
 
-        /**
-         * Fetch all tasks from the server and render them.
-         */
-        async function fetchTasks() {
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to fetch tasks');
-                }
-                const tasks = await response.json();
-                renderTaskList(tasks);
-            } catch (error) {
-                console.error('Error fetching tasks:', error);
-                showError(`Failed to load tasks: ${error.message}`);
-            }
+        const taskData = {
+            text: taskText,
+            // --- MODIFICATION START ---
+            priority: taskPriority.value
+            // --- MODIFICATION END ---
+        };
+
+        const dueDate = taskDueDate.value;
+        const dueTime = taskDueTime.value;
+        if (dueDate && dueTime) {
+            taskData.dueDate = new Date(`${dueDate}T${dueTime}`).toISOString();
+        } else if (dueDate) {
+            taskData.dueDate = new Date(dueDate).toISOString();
         }
 
-        /**
-         * Render the list of tasks.
-         * @param {Array} tasks
-         */
-        function renderTaskList(tasks) {
-            taskList.innerHTML = '';
-            tasks.forEach(renderTask);
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
+            });
+            if (!response.ok) throw new Error('Failed to add task');
+            const newTask = await response.json();
+            renderTask(newTask);
+            // Clear inputs
+            taskInput.value = '';
+            taskDueDate.value = '';
+            taskDueTime.value = '';
+            taskPriority.value = 'medium';
+            taskInput.focus();
+        } catch (error) {
+            showError(error.message);
         }
+    }
 
-        /**
-         * Render a single task item in the table.
-         * @param {Object} task
-         */
-        function renderTask(task) {
-            const tr = document.createElement('tr');
-            tr.className = 'task-item';
-            tr.dataset.id = task._id;
-            if (task.completed) tr.classList.add('completed');
+    async function handleTaskClick(event) {
+        const target = event.target;
+        const taskItem = target.closest('.task-item');
+        if (!taskItem) return;
+        const taskId = taskItem.dataset.id;
 
-            tr.innerHTML = `
-                <td>
-                    <span class="text">${escapeHtml(task.text)}</span>
-                </td>
-                <td class="actions">
-                    <button class="delete-btn" title="Delete Task">❌</button>
-                </td>
-            `;
-            taskList.appendChild(tr);
+        if (target.classList.contains('delete-btn')) {
+            await deleteTask(taskId, taskItem);
+        } else if (target.matches('.complete-btn, .text')) {
+            await toggleTaskCompletion(taskId);
         }
+    }
 
-        /**
-         * Escape HTML to prevent XSS.
-         * @param {string} str
-         * @returns {string}
-         */
-        function escapeHtml(str) {
-            return str.replace(/[&<>"']/g, (m) => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            })[m]);
+    async function deleteTask(taskId, taskItem) {
+        try {
+            const response = await fetch(`${API_URL}/${taskId}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete task');
+            taskItem.remove();
+        } catch (error) {
+            showError('Could not delete task.');
         }
+    }
 
-        /**
-         * Add a new task.
-         */
-        async function addTask() {
-            const taskText = taskInput.value.trim();
-            if (!taskText) {
-                showError('Task cannot be empty!');
-                return;
-            }
-
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: taskText })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to add task');
-                }
-
-                const newTask = await response.json();
-                renderTask(newTask);
-                taskInput.value = '';
-                taskInput.focus();
-            } catch (error) {
-                console.error('Error adding task:', error);
-                showError(error.message);
-            }
+    async function toggleTaskCompletion(taskId) {
+        try {
+            const response = await fetch(`${API_URL}/${taskId}`, { method: 'PUT' });
+            if (!response.ok) throw new Error('Failed to update task');
+            await fetchTasks(); // Re-fetch all tasks to ensure UI is consistent
+        } catch (error) {
+            showError('Could not update task.');
         }
+    }
 
-        /**
-         * Handle clicks on task items (for completing or deleting).
-         * @param {MouseEvent} event
-         */
-        async function handleTaskClick(event) {
-            const target = event.target;
-            const taskItem = target.closest('.task-item');
-            if (!taskItem) return;
-
-            const taskId = taskItem.dataset.id;
-
-            if (target.classList.contains('delete-btn')) {
-                await deleteTask(taskId, taskItem);
-            } else if (target.classList.contains('text')) {
-                await toggleTaskCompletion(taskId, taskItem);
-            }
-        }
-
-        /**
-         * Delete a task.
-         * @param {string} taskId
-         * @param {HTMLElement} taskItem
-         */
-        async function deleteTask(taskId, taskItem) {
-            try {
-                const response = await fetch(`${API_URL}/${taskId}`, { method: 'DELETE' });
-                if (!response.ok) throw new Error('Failed to delete task');
-                taskItem.remove();
-            } catch (error) {
-                console.error('Error deleting task:', error);
-                showError('Could not delete task.');
-            }
-        }
-
-        /**
-         * Toggle task completion.
-         * @param {string} taskId
-         * @param {HTMLElement} taskItem
-         */
-        async function toggleTaskCompletion(taskId, taskItem) {
-            try {
-                const response = await fetch(`${API_URL}/${taskId}`, { method: 'PUT' });
-                if (!response.ok) throw new Error('Failed to update task');
-                taskItem.classList.toggle('completed');
-            } catch (error) {
-                console.error('Error updating task:', error);
-                showError('Could not update task.');
-            }
-        }
-
-        // Event Listeners
-        addTaskBtn.addEventListener('click', addTask);
-        taskInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') addTask();
-        });
-        taskList.addEventListener('click', handleTaskClick);
-
-        // Initial fetch of tasks and start the clock
-        fetchTasks();
-        updateDateTime();
-        setInterval(updateDateTime, 1000);
+    addTaskBtn.addEventListener('click', addTask);
+    taskInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addTask();
     });
+    taskList.addEventListener('click', handleTaskClick);
+
+    fetchTasks();
+});

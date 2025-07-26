@@ -41,4 +41,4 @@ Vanilla JavaScript (ES6+): For all client-side logic and API communication.
 
 Database:
 
-Simple JSON files (users.json, tasks.json) for straightforward data storage.
+MongoDB

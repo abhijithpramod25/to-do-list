@@ -1,4 +1,4 @@
 flask
-flask-cors
 Flask-Bcrypt
 Flask-Login
+pymongo[srv]

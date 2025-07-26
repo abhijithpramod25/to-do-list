@@ -1,33 +1,44 @@
-To-Do List Application
-A simple and intuitive to-do list application with a modern user interface, built with a Flask backend and a vanilla JavaScript frontend.
+Advanced To-Do List Application
+This is a full-stack to-do list application built with a Python (Flask) backend and a vanilla JavaScript frontend. It has evolved from a simple task manager into a feature-rich, multi-user platform with a clean, modern interface.
 
-Features
-Add Tasks: Quickly add new tasks to your to-do list.
+The application allows users to register, log in, and manage their own private set of tasks, complete with due dates, priorities, and nested subtasks.
 
-Delete Tasks: Remove tasks that are no longer needed.
+✨ Features
+User Authentication: Secure user registration and login system. Each user's data is kept private.
 
-Dynamic UI: The user interface is dynamically updated without page reloads.
+Task Management: Create, complete, and delete tasks.
 
-Date and Time: Displays the current date and time.
+Subtasks: Break down complex tasks into smaller, manageable subtasks.
 
-RESTful API: A simple and effective RESTful API for managing tasks.
+Due Dates & Times: Assign a specific due date and time to any task. Overdue tasks are highlighted.
 
-Technologies Used
+Task Priorities: Organize tasks with High, Medium, or Low priority levels, each with a distinct color code.
+
+Light/Dark Theme: A theme switcher to toggle between light and dark modes, with the user's preference saved locally.
+
+Responsive UI: A clean user interface that works on different screen sizes.
+
+Animations: Smooth animations for adding and removing tasks, making the UI feel more dynamic.
+
+🛠️ Tech Stack
+Backend:
+
+Python 3
+
+Flask: A lightweight web framework for the API.
+
+Flask-Login: Manages user sessions and authentication.
+
+Flask-Bcrypt: For securely hashing user passwords.
+
 Frontend:
 
 HTML5
 
-CSS3
+CSS3 (with CSS Variables for theming)
 
-JavaScript (ES6)
-
-Backend:
-
-Python
-
-Flask
+Vanilla JavaScript (ES6+): For all client-side logic and API communication.
 
 Database:
 
-JSON file (for simplicity)
-"# to-do-list" 
+Simple JSON files (users.json, tasks.json) for straightforward data storage.

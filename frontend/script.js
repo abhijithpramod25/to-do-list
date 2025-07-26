@@ -1,39 +1,45 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = '/api/tasks';
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const statusResponse = await fetch('/api/status');
+        if (!statusResponse.ok) throw new Error('Not logged in');
+        const statusData = await statusResponse.json();
+        if (!statusData.logged_in) throw new Error('Not logged in');
+        initializeApp(statusData.user);
+    } catch (error) {
+        window.location.href = '/login.html';
+    }
+});
+
+function initializeApp(user) {
     const taskInput = document.getElementById('task-input');
     const addTaskBtn = document.getElementById('add-task-btn');
     const taskList = document.getElementById('task-list');
     const taskDueDate = document.getElementById('task-due-date');
     const taskDueTime = document.getElementById('task-due-time');
     const taskPriority = document.getElementById('task-priority');
-    // --- MODIFICATION START ---
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const usernameDisplay = document.getElementById('username-display');
     const body = document.body;
-    // --- MODIFICATION END ---
+    const API_URL = '/api/tasks';
 
+    usernameDisplay.textContent = user.username;
 
-    // --- THEME SWITCHER LOGIC ---
     function applyTheme(theme) {
-        if (theme === 'dark') {
-            body.classList.add('dark-theme');
-            themeToggleBtn.textContent = '🌙';
-        } else {
-            body.classList.remove('dark-theme');
-            themeToggleBtn.textContent = '☀️';
-        }
+        body.classList.toggle('dark-theme', theme === 'dark');
+        themeToggleBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
     }
-
     themeToggleBtn.addEventListener('click', () => {
-        const currentTheme = body.classList.contains('dark-theme') ? 'light' : 'dark';
-        localStorage.setItem('theme', currentTheme);
-        applyTheme(currentTheme);
+        const newTheme = body.classList.contains('dark-theme') ? 'light' : 'dark';
+        localStorage.setItem('theme', newTheme);
+        applyTheme(newTheme);
     });
+    applyTheme(localStorage.getItem('theme') || 'light');
 
-    // Apply saved theme on initial load
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    applyTheme(savedTheme);
-    // --- THEME SWITCHER LOGIC END ---
-
+    logoutBtn.addEventListener('click', async () => {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login.html';
+    });
 
     async function fetchTasks() {
         try {
@@ -46,19 +52,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTaskList(tasks) {
         taskList.innerHTML = '';
-        tasks.forEach(task => {
-            const taskElement = createTaskElement(task);
-            taskList.appendChild(taskElement);
-        });
+        tasks.forEach(task => taskList.appendChild(createTaskElement(task)));
     }
 
     function createTaskElement(task) {
-        // This function remains unchanged from the previous version
         const taskElement = document.createElement('div');
         const priority = task.priority || 'medium';
         taskElement.className = `task-item priority-${priority}`;
         taskElement.dataset.id = task._id;
-        
+
         const now = new Date();
         const dueDate = task.dueDate ? new Date(task.dueDate) : null;
         if (task.completed) {
@@ -67,9 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
             taskElement.classList.add('overdue');
         }
         const formattedDueDate = dueDate ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not set';
-        
-        const subtasks = task.subtasks || [];
-        const subtasksHtml = `<div class="subtask-list">${subtasks.map(st => `
+
+        const subtasksHtml = `<div class="subtask-list">${(task.subtasks || []).map(st => `
             <div class="subtask-item ${st.completed ? 'completed' : ''}" data-subtask-id="${st._id}">
                 <span class="subtask-complete-btn"></span>
                 <span class="subtask-text">${escapeHtml(st.text)}</span>
@@ -92,17 +93,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function addTask() {
-        // This function remains unchanged
         const taskText = taskInput.value.trim();
         if (!taskText) return;
-        
         const taskData = { text: taskText, priority: taskPriority.value };
         const dueDate = taskDueDate.value;
         const dueTime = taskDueTime.value;
         if (dueDate) {
             taskData.dueDate = new Date(`${dueDate}T${dueTime || '00:00'}`).toISOString();
         }
-
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
@@ -119,52 +117,61 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { console.error(error); }
     }
     
-    // --- Other functions (saveSubtask, toggleCompletion, deleteTask, etc.) remain unchanged ---
     async function saveSubtask(taskId, inputElement) {
         const text = inputElement.value.trim();
         if (!text) return;
         try {
-            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
+            await fetch(`${API_URL}/${taskId}/subtasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text })
             });
-            if (!response.ok) throw new Error('Failed to add subtask');
             await fetchTasks();
         } catch (error) { console.error(error); }
     }
+
     async function toggleCompletion(taskId, subtaskId = null) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         try {
-            const response = await fetch(url, { method: 'PUT' });
-            if (!response.ok) throw new Error('Failed to update status');
+            await fetch(url, { method: 'PUT' });
             await fetchTasks();
         } catch (error) { console.error(error); }
     }
+
     async function deleteTask(taskId, subtaskId = null) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         if (!confirm('Are you sure?')) return;
         try {
-            const response = await fetch(url, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Failed to delete');
+            await fetch(url, { method: 'DELETE' });
             await fetchTasks();
         } catch (error) { console.error(error); }
     }
+
+    function escapeHtml(str) {
+        return str?.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])) || '';
+    }
+
+    addTaskBtn.addEventListener('click', addTask);
+    taskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addTask());
+
     taskList.addEventListener('click', (event) => {
         const target = event.target;
         const taskItem = target.closest('.task-item');
         if (!taskItem) return;
         const taskId = taskItem.dataset.id;
+        
         if (target.classList.contains('task-complete-btn')) toggleCompletion(taskId);
         if (target.classList.contains('task-delete-btn')) deleteTask(taskId);
         if (target.classList.contains('add-subtask-btn')) {
             const form = taskItem.querySelector('.add-subtask-form');
             form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+            if(form.style.display === 'flex') form.querySelector('.subtask-input').focus();
         }
         if (target.classList.contains('save-subtask-btn')) {
             const input = taskItem.querySelector('.subtask-input');
             saveSubtask(taskId, input);
         }
+
         const subtaskItem = target.closest('.subtask-item');
         if (subtaskItem) {
             const subtaskId = subtaskItem.dataset.subtaskId;
@@ -172,11 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (target.classList.contains('subtask-delete-btn')) deleteTask(taskId, subtaskId);
         }
     });
-    addTaskBtn.addEventListener('click', addTask);
-    taskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addTask());
-    function escapeHtml(str) {
-        return str?.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])) || '';
-    }
     
     fetchTasks();
-});
+}

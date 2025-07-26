@@ -34,6 +34,7 @@ body {
     padding: 40px 20px;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
+
 .container {
     max-width: 800px;
     margin: 0 auto;
@@ -43,27 +44,50 @@ body {
     box-shadow: 0 4px 15px var(--shadow-color);
     transition: background-color 0.3s ease;
 }
+
+h1 {
+    text-align: center;
+    color: var(--header-color);
+    margin-bottom: 20px;
+}
+
+/* --- Header & Auth Section --- */
 .header-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
-h1 {
-    text-align: center;
-    color: var(--header-color);
-    margin: 0;
+
+.welcome-message {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-secondary-color);
 }
+
 #theme-toggle-btn {
     font-size: 1.5rem;
     background: none;
     border: none;
     cursor: pointer;
     padding: 5px;
+    color: var(--text-color);
+}
+
+#logout-btn {
+    background-color: #e74c3c;
+    color: #fff;
+    border: none;
+    font-weight: 600;
 }
 
 /* --- Input Area --- */
-.input-area { display: flex; gap: 10px; margin-bottom: 25px; }
+.input-area {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+}
 #task-input, #task-due-date, #task-due-time, #task-priority {
     padding: 10px;
     border: 1px solid var(--border-color);
@@ -108,14 +132,26 @@ h1 {
     border-radius: 5px;
     margin-bottom: 10px;
     border-left: 4px solid #aaa;
+    transition: box-shadow 0.3s ease, border-left-color 0.3s ease;
+    animation: fadeInDown 0.5s ease-out;
 }
+.task-item.is-removing {
+    animation: fadeOutUp 0.4s ease-in forwards;
+}
+
 .task-item.completed { border-left-color: #5cb85c !important; }
 .task-item.overdue { border-left-color: #e74c3c; }
 .task-item.priority-high { border-left-color: #e74c3c; }
 .task-item.priority-medium { border-left-color: #f39c12; }
 .task-item.priority-low { border-left-color: #3498db; }
 
-.task-main-content { display: flex; align-items: center; width: 100%; padding: 12px; box-sizing: border-box; }
+.task-main-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+}
 .task-text { flex-grow: 1; margin: 0 10px; }
 .task-item.completed .task-text { text-decoration: line-through; color: #aaa; }
 .task-duedate { width: 140px; text-align: center; font-size: 0.9em; color: var(--text-secondary-color); }
@@ -127,7 +163,7 @@ h1 {
 .priority-low .priority-label { background-color: #3498db; }
 .task-actions { display: flex; gap: 10px; width: 200px; justify-content: flex-end; }
 
-/* Subtask Styling */
+/* --- Subtask Styling --- */
 .subtask-container { width: 100%; box-sizing: border-box; padding: 0 12px 12px 40px; }
 .subtask-item { display: flex; align-items: center; padding: 8px 0; font-size: 0.95em; border-top: 1px dashed var(--border-color); }
 .subtask-item.completed .subtask-text { text-decoration: line-through; color: #bbb; }
@@ -135,7 +171,7 @@ h1 {
 .add-subtask-form { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
 .subtask-input { flex-grow: 1; padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; background-color: var(--bg-color); color: var(--text-color); }
 
-/* Buttons */
+/* --- Buttons --- */
 .task-complete-btn, .subtask-complete-btn {
     width: 18px; height: 18px; border: 2px solid var(--text-secondary-color); border-radius: 50%;
     cursor: pointer; flex-shrink: 0;
@@ -144,3 +180,32 @@ h1 {
 button { cursor: pointer; background-color: var(--button-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; color: var(--text-color); }
 .task-delete-btn, .subtask-delete-btn { background: none; border: none; color: #e74c3c; font-size: 1.2em; }
 .save-subtask-btn { background-color: #3498db; color: #fff; border: none; }
+
+/* --- Authentication Page Styles --- */
+.auth-container {
+    max-width: 400px;
+    margin: 80px auto;
+    padding: 40px;
+    background: var(--container-bg);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+    text-align: center;
+}
+.auth-container h2 { color: var(--header-color); margin-bottom: 25px; }
+.form-group { margin-bottom: 20px; text-align: left; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--text-secondary-color); }
+.form-group input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box; background-color: var(--bg-color); color: var(--text-color); }
+.auth-btn { width: 100%; padding: 12px; font-size: 1.1em; font-weight: 600; background-color: #5cb85c; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+.auth-switch { margin-top: 20px; color: var(--text-secondary-color); }
+.auth-switch a { color: #5cb85c; text-decoration: none; }
+#error-message { margin-top: 20px; color: #e74c3c; background-color: rgba(231, 76, 60, 0.1); padding: 10px; border-radius: 5px; display: none; }
+
+/* --- Animations --- */
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOutUp {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-10px); max-height: 0; padding: 0; margin: 0; border: 0; }
+}

@@ -70,12 +70,7 @@ function initializeApp(user) {
         }
         const formattedDueDate = dueDate ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not set';
 
-        const subtasksHtml = `<div class="subtask-list">${(task.subtasks || []).map(st => `
-            <div class="subtask-item ${st.completed ? 'completed' : ''}" data-subtask-id="${st._id}">
-                <span class="subtask-complete-btn"></span>
-                <span class="subtask-text">${escapeHtml(st.text)}</span>
-                <button class="subtask-delete-btn">❌</button>
-            </div>`).join('')}</div>`;
+        const subtasksHtml = `<div class="subtask-list">${(task.subtasks || []).map(st => createSubtaskElement(st).outerHTML).join('')}</div>`;
 
         taskElement.innerHTML = `
             <div class="task-main-content">
@@ -90,6 +85,19 @@ function initializeApp(user) {
             </div>
             <div class="subtask-container">${subtasksHtml}<div class="add-subtask-form" style="display:none;"><input type="text" class="subtask-input" placeholder="New subtask..."><button class="save-subtask-btn">Save</button></div></div>`;
         return taskElement;
+    }
+
+    // --- NEW HELPER FUNCTION ---
+    function createSubtaskElement(subtask) {
+        const subtaskElement = document.createElement('div');
+        subtaskElement.className = `subtask-item ${subtask.completed ? 'completed' : ''}`;
+        subtaskElement.dataset.subtaskId = subtask._id;
+        subtaskElement.innerHTML = `
+            <span class="subtask-complete-btn"></span>
+            <span class="subtask-text">${escapeHtml(subtask.text)}</span>
+            <button class="subtask-delete-btn">❌</button>
+        `;
+        return subtaskElement;
     }
 
     async function addTask() {
@@ -108,7 +116,8 @@ function initializeApp(user) {
                 body: JSON.stringify(taskData)
             });
             if (!response.ok) throw new Error('Failed to add task');
-            await fetchTasks();
+            const newTask = await response.json();
+            taskList.appendChild(createTaskElement(newTask)); // Add just the new task
             taskInput.value = '';
             taskDueDate.value = '';
             taskDueTime.value = '';
@@ -117,24 +126,43 @@ function initializeApp(user) {
         } catch (error) { console.error(error); }
     }
     
+    // --- CORRECTED saveSubtask Function ---
     async function saveSubtask(taskId, inputElement) {
         const text = inputElement.value.trim();
         if (!text) return;
+
         try {
-            await fetch(`${API_URL}/${taskId}/subtasks`, {
+            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text })
             });
-            await fetchTasks();
-        } catch (error) { console.error(error); }
+
+            if (!response.ok) throw new Error('Failed to save subtask');
+            
+            const newSubtask = await response.json();
+            const taskElement = document.querySelector(`.task-item[data-id="${taskId}"]`);
+            
+            if (taskElement) {
+                const subtaskElement = createSubtaskElement(newSubtask);
+                taskElement.querySelector('.subtask-list').appendChild(subtaskElement);
+                inputElement.value = '';
+                taskElement.querySelector('.add-subtask-form').style.display = 'none';
+            }
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     async function toggleCompletion(taskId, subtaskId = null) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         try {
             await fetch(url, { method: 'PUT' });
-            await fetchTasks();
+            // Instead of full refresh, just toggle class
+            const element = subtaskId
+                ? document.querySelector(`[data-subtask-id="${subtaskId}"]`)
+                : document.querySelector(`[data-id="${taskId}"]`);
+            if (element) element.classList.toggle('completed');
         } catch (error) { console.error(error); }
     }
 
@@ -142,8 +170,12 @@ function initializeApp(user) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         if (!confirm('Are you sure?')) return;
         try {
-            await fetch(url, { method: 'DELETE' });
-            await fetchTasks();
+            const response = await fetch(url, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete');
+            const element = subtaskId
+                ? document.querySelector(`[data-subtask-id="${subtaskId}"]`)
+                : document.querySelector(`[data-id="${taskId}"]`);
+            if (element) element.remove();
         } catch (error) { console.error(error); }
     }
 
@@ -165,7 +197,7 @@ function initializeApp(user) {
         if (target.classList.contains('add-subtask-btn')) {
             const form = taskItem.querySelector('.add-subtask-form');
             form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-            if(form.style.display === 'flex') form.querySelector('.subtask-input').focus();
+            if (form.style.display === 'flex') form.querySelector('.subtask-input').focus();
         }
         if (target.classList.contains('save-subtask-btn')) {
             const input = taskItem.querySelector('.subtask-input');

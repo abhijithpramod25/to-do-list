@@ -21,7 +21,14 @@ function initializeApp(user) {
     const logoutBtn = document.getElementById('logout-btn');
     const usernameDisplay = document.getElementById('username-display');
     const body = document.body;
+    const searchInput = document.getElementById('search-input');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const sortSelect = document.getElementById('sort-select');
     const API_URL = '/api/tasks';
+
+    let currentFilter = 'all';
+    let currentSort = 'default';
+    let currentSearchTerm = '';
 
     usernameDisplay.textContent = user.username;
 
@@ -42,8 +49,14 @@ function initializeApp(user) {
     });
 
     async function fetchTasks() {
+        const params = new URLSearchParams({
+            filter: currentFilter,
+            sortBy: currentSort,
+            search: currentSearchTerm
+        });
+        const requestUrl = `${API_URL}?${params.toString()}`;
         try {
-            const response = await fetch(API_URL);
+            const response = await fetch(requestUrl);
             if (!response.ok) throw new Error('Failed to fetch tasks');
             const tasks = await response.json();
             renderTaskList(tasks);
@@ -87,7 +100,6 @@ function initializeApp(user) {
         return taskElement;
     }
 
-    // --- NEW HELPER FUNCTION ---
     function createSubtaskElement(subtask) {
         const subtaskElement = document.createElement('div');
         subtaskElement.className = `subtask-item ${subtask.completed ? 'completed' : ''}`;
@@ -110,14 +122,12 @@ function initializeApp(user) {
             taskData.dueDate = new Date(`${dueDate}T${dueTime || '00:00'}`).toISOString();
         }
         try {
-            const response = await fetch(API_URL, {
+            await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(taskData)
             });
-            if (!response.ok) throw new Error('Failed to add task');
-            const newTask = await response.json();
-            taskList.appendChild(createTaskElement(newTask)); // Add just the new task
+            await fetchTasks();
             taskInput.value = '';
             taskDueDate.value = '';
             taskDueTime.value = '';
@@ -126,43 +136,24 @@ function initializeApp(user) {
         } catch (error) { console.error(error); }
     }
     
-    // --- CORRECTED saveSubtask Function ---
     async function saveSubtask(taskId, inputElement) {
         const text = inputElement.value.trim();
         if (!text) return;
-
         try {
-            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
+            await fetch(`${API_URL}/${taskId}/subtasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text })
             });
-
-            if (!response.ok) throw new Error('Failed to save subtask');
-            
-            const newSubtask = await response.json();
-            const taskElement = document.querySelector(`.task-item[data-id="${taskId}"]`);
-            
-            if (taskElement) {
-                const subtaskElement = createSubtaskElement(newSubtask);
-                taskElement.querySelector('.subtask-list').appendChild(subtaskElement);
-                inputElement.value = '';
-                taskElement.querySelector('.add-subtask-form').style.display = 'none';
-            }
-        } catch (error) {
-            console.error(error);
-        }
+            await fetchTasks();
+        } catch (error) { console.error(error); }
     }
 
     async function toggleCompletion(taskId, subtaskId = null) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         try {
             await fetch(url, { method: 'PUT' });
-            // Instead of full refresh, just toggle class
-            const element = subtaskId
-                ? document.querySelector(`[data-subtask-id="${subtaskId}"]`)
-                : document.querySelector(`[data-id="${taskId}"]`);
-            if (element) element.classList.toggle('completed');
+            await fetchTasks();
         } catch (error) { console.error(error); }
     }
 
@@ -170,12 +161,8 @@ function initializeApp(user) {
         const url = subtaskId ? `${API_URL}/${taskId}/subtasks/${subtaskId}` : `${API_URL}/${taskId}`;
         if (!confirm('Are you sure?')) return;
         try {
-            const response = await fetch(url, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Failed to delete');
-            const element = subtaskId
-                ? document.querySelector(`[data-subtask-id="${subtaskId}"]`)
-                : document.querySelector(`[data-id="${taskId}"]`);
-            if (element) element.remove();
+            await fetch(url, { method: 'DELETE' });
+            await fetchTasks();
         } catch (error) { console.error(error); }
     }
 
@@ -186,6 +173,25 @@ function initializeApp(user) {
     addTaskBtn.addEventListener('click', addTask);
     taskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addTask());
 
+    searchInput.addEventListener('input', () => {
+        currentSearchTerm = searchInput.value;
+        fetchTasks();
+    });
+
+    filterButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            currentFilter = button.dataset.filter;
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            fetchTasks();
+        });
+    });
+
+    sortSelect.addEventListener('change', () => {
+        currentSort = sortSelect.value;
+        fetchTasks();
+    });
+    
     taskList.addEventListener('click', (event) => {
         const target = event.target;
         const taskItem = target.closest('.task-item');
@@ -197,7 +203,7 @@ function initializeApp(user) {
         if (target.classList.contains('add-subtask-btn')) {
             const form = taskItem.querySelector('.add-subtask-form');
             form.style.display = form.style.display === 'none' ? 'flex' : 'none';
-            if (form.style.display === 'flex') form.querySelector('.subtask-input').focus();
+            if(form.style.display === 'flex') form.querySelector('.subtask-input').focus();
         }
         if (target.classList.contains('save-subtask-btn')) {
             const input = taskItem.querySelector('.subtask-input');

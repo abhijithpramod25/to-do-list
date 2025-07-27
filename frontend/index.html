@@ -32,6 +32,19 @@
             <button id="add-task-btn">Add</button>
         </div>
         
+        <div class="controls-area">
+            <input type="text" id="search-input" placeholder="Search tasks...">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="active">Active</button>
+                <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+            <select id="sort-select">
+                <option value="default">Sort by Default</option>
+                <option value="dueDate">Sort by Due Date</option>
+                <option value="priority">Sort by Priority</option>
+            </select>
+        </div>
         <div class="task-list-header">
             <span class="header-main">Task</span>
             <span class="header-duedate">Due Date</span>

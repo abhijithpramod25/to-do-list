@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
 from flask_bcrypt import Bcrypt
@@ -6,68 +7,53 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from pymongo import MongoClient
 from bson import ObjectId
 
-# Load environment variables from .env file
 load_dotenv()
 
-# --- Configuration ---
-backend_dir = os.path.dirname(os.path.abspath(__file__))
-frontend_dir = os.path.join(backend_dir, '..', 'frontend')
-
-# --- App Initialization ---
-app = Flask(__name__, static_folder=frontend_dir, static_url_path='')
-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a_default_secret_key") # Use an env variable for the secret key too
+# --- App Initialization & Config ---
+app = Flask(__name__, static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend'))
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "a_default_secret_key")
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login.html'
 
 # --- MongoDB Connection ---
-# Securely load the MongoDB URI from the environment variable
 MONGO_URI = os.getenv("MONGO_URI")
-db = None # Initialize db as None
-
-# Check if the MONGO_URI is set before attempting to connect
+db = None
 if MONGO_URI:
     try:
         client = MongoClient(MONGO_URI)
-        # The ismaster command is cheap and does not require auth.
         client.admin.command('ismaster')
         db = client.get_database()
         print("✅ MongoDB connection successful.")
     except Exception as e:
         print(f"❌ MongoDB connection failed: {e}")
 else:
-    print("❌ MONGO_URI environment variable not set. Please create a .env file.")
+    print("❌ MONGO_URI environment variable not set.")
 
-# --- User Model ---
+# --- User Model & Loader ---
 class User(UserMixin):
     def __init__(self, user_data):
         self.id = str(user_data['_id'])
         self.username = user_data['username']
         self.password = user_data['password']
-
     @staticmethod
     def get(user_id):
         if db is None: return None
         user_data = db.users.find_one({'_id': ObjectId(user_id)})
         return User(user_data) if user_data else None
-
 @login_manager.user_loader
-def load_user(user_id):
-    return User.get(user_id)
+def load_user(user_id): return User.get(user_id)
 
-# --- Helper to serialize MongoDB documents ---
 def serialize_doc(doc):
-    if doc and '_id' in doc:
+    if doc:
         doc['_id'] = str(doc['_id'])
-    if doc and 'user_id' in doc:
-        doc['user_id'] = str(doc['user_id'])
-    if doc and 'subtasks' in doc:
-        for subtask in doc['subtasks']:
-            if '_id' in subtask:
-                subtask['_id'] = str(subtask['_id'])
+        if 'user_id' in doc: doc['user_id'] = str(doc['user_id'])
+        if 'subtasks' in doc:
+            for subtask in doc['subtasks']:
+                if '_id' in subtask: subtask['_id'] = str(subtask['_id'])
     return doc
 
-# --- Authentication API Routes ---
+# --- Auth Routes --- (Unchanged)
 @app.route('/api/register', methods=['POST'])
 def register():
     if db is None: return jsonify({"error": "Database connection is not available"}), 500
@@ -93,9 +79,7 @@ def login():
 
 @app.route('/api/logout', methods=['POST'])
 @login_required
-def logout():
-    logout_user()
-    return jsonify({"message": "Logout successful"}), 200
+def logout(): logout_user(); return jsonify({"message": "Logout successful"}), 200
 
 @app.route('/api/status')
 def status():
@@ -103,7 +87,7 @@ def status():
         return jsonify({"logged_in": True, "user": {"id": current_user.id, "username": current_user.username}}), 200
     return jsonify({"logged_in": False}), 401
 
-# --- Task API Routes ---
+# --- Task Routes ---
 @app.route('/api/tasks', methods=['GET', 'POST'])
 @login_required
 def handle_tasks():
@@ -120,12 +104,54 @@ def handle_tasks():
         inserted_task = db.tasks.find_one({'_id': result.inserted_id})
         return jsonify(serialize_doc(inserted_task)), 201
     else: # GET
-        user_tasks = [serialize_doc(task) for task in db.tasks.find({'user_id': user_id})]
+        # --- MODIFICATION START: MongoDB Filtering, Searching, and Sorting ---
+        query = {'user_id': user_id}
+        
+        search_term = request.args.get('search', '')
+        if search_term:
+            query['text'] = {'$regex': re.escape(search_term), '$options': 'i'}
+
+        task_filter = request.args.get('filter', 'all')
+        if task_filter == 'active':
+            query['completed'] = False
+        elif task_filter == 'completed':
+            query['completed'] = True
+
+        sort_by = request.args.get('sortBy', 'default')
+        sort_query = []
+        if sort_by == 'dueDate':
+            sort_query = [('dueDate', 1)]
+        elif sort_by == 'priority':
+            pipeline = [
+                {'$match': query},
+                {'$addFields': {
+                    'priorityOrder': {
+                        '$switch': {
+                            'branches': [
+                                {'case': {'$eq': ['$priority', 'high']}, 'then': 1},
+                                {'case': {'$eq': ['$priority', 'medium']}, 'then': 2},
+                                {'case': {'$eq': ['$priority', 'low']}, 'then': 3}
+                            ], 'default': 4
+                        }
+                    }
+                }},
+                {'$sort': {'priorityOrder': 1}}
+            ]
+            user_tasks = [serialize_doc(task) for task in db.tasks.aggregate(pipeline)]
+            return jsonify(user_tasks)
+
+        cursor = db.tasks.find(query)
+        if sort_query:
+            cursor = cursor.sort(sort_query)
+        
+        user_tasks = [serialize_doc(task) for task in cursor]
         return jsonify(user_tasks)
+        # --- MODIFICATION END ---
 
 @app.route('/api/tasks/<task_id>', methods=['PUT', 'DELETE'])
 @login_required
 def handle_single_task(task_id):
+    # ... (unchanged)
     if db is None: return jsonify({"error": "Database connection is not available"}), 500
     user_id, task_oid = ObjectId(current_user.id), ObjectId(task_id)
     task = db.tasks.find_one({'_id': task_oid, 'user_id': user_id})
@@ -139,7 +165,7 @@ def handle_single_task(task_id):
         db.tasks.delete_one({'_id': task_oid})
         return '', 204
 
-# --- Subtask Routes ---
+# --- Subtask Routes --- (Unchanged)
 @app.route('/api/tasks/<task_id>/subtasks', methods=['POST'])
 @login_required
 def add_subtask(task_id):
@@ -175,19 +201,19 @@ def handle_single_subtask(task_id, subtask_id):
         )
         return '', 204
 
-# --- Serve Frontend ---
+# --- Serve Frontend --- (Unchanged)
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
+    static_folder = app.static_folder
     if not current_user.is_authenticated and path not in ['login.html', 'register.html', 'style.css', 'auth.js']:
-        return send_from_directory(app.static_folder, 'login.html')
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
+        return send_from_directory(static_folder, 'login.html')
+    if path and os.path.exists(os.path.join(static_folder, path)):
+        return send_from_directory(static_folder, path)
+    return send_from_directory(static_folder, 'index.html')
 
 if __name__ == '__main__':
     if db is None:
-        print("\n--- 🚨 Cannot start server: MongoDB connection is not available. 🚨 ---")
-        print("--- Please check your MONGO_URI in the .env file and network access rules in MongoDB Atlas. ---\n")
+        print("\n--- 🚨 Cannot start server: MongoDB connection failed. 🚨 ---\n")
     else:
         app.run(host='0.0.0.0', port=5000, debug=True)

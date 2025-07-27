@@ -1,5 +1,7 @@
 import os
 import re
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
 from flask_bcrypt import Bcrypt
@@ -98,69 +100,65 @@ def handle_tasks():
         if not task_data or not task_data.get('text', '').strip(): return jsonify({'error': 'Task text cannot be empty'}), 400
         new_task = {
             'text': task_data['text'].strip(), 'completed': False, 'user_id': user_id,
-            'priority': task_data.get('priority', 'medium'), 'subtasks': [], 'dueDate': task_data.get('dueDate')
+            'priority': task_data.get('priority', 'medium'), 'subtasks': [], 'dueDate': task_data.get('dueDate'),
+            # --- MODIFICATION START ---
+            'recurrence': task_data.get('recurrence', 'none')
+            # --- MODIFICATION END ---
         }
         result = db.tasks.insert_one(new_task)
         inserted_task = db.tasks.find_one({'_id': result.inserted_id})
         return jsonify(serialize_doc(inserted_task)), 201
     else: # GET
-        # --- MODIFICATION START: MongoDB Filtering, Searching, and Sorting ---
+        # ... (GET logic with filtering/sorting is unchanged)
         query = {'user_id': user_id}
-        
         search_term = request.args.get('search', '')
-        if search_term:
-            query['text'] = {'$regex': re.escape(search_term), '$options': 'i'}
-
+        if search_term: query['text'] = {'$regex': re.escape(search_term), '$options': 'i'}
         task_filter = request.args.get('filter', 'all')
-        if task_filter == 'active':
-            query['completed'] = False
-        elif task_filter == 'completed':
-            query['completed'] = True
-
+        if task_filter == 'active': query['completed'] = False
+        elif task_filter == 'completed': query['completed'] = True
         sort_by = request.args.get('sortBy', 'default')
-        sort_query = []
-        if sort_by == 'dueDate':
-            sort_query = [('dueDate', 1)]
-        elif sort_by == 'priority':
-            pipeline = [
-                {'$match': query},
-                {'$addFields': {
-                    'priorityOrder': {
-                        '$switch': {
-                            'branches': [
-                                {'case': {'$eq': ['$priority', 'high']}, 'then': 1},
-                                {'case': {'$eq': ['$priority', 'medium']}, 'then': 2},
-                                {'case': {'$eq': ['$priority', 'low']}, 'then': 3}
-                            ], 'default': 4
-                        }
-                    }
-                }},
-                {'$sort': {'priorityOrder': 1}}
-            ]
+        if sort_by == 'priority':
+            # ... (priority sort logic is unchanged)
+            pipeline = [ {'$match': query}, {'$addFields': {'priorityOrder': {'$switch': {'branches': [ {'case': {'$eq': ['$priority', 'high']}, 'then': 1}, {'case': {'$eq': ['$priority', 'medium']}, 'then': 2}, {'case': {'$eq': ['$priority', 'low']}, 'then': 3}], 'default': 4}}}}, {'$sort': {'priorityOrder': 1}}]
             user_tasks = [serialize_doc(task) for task in db.tasks.aggregate(pipeline)]
             return jsonify(user_tasks)
-
         cursor = db.tasks.find(query)
-        if sort_query:
-            cursor = cursor.sort(sort_query)
-        
+        if sort_by == 'dueDate': cursor = cursor.sort([('dueDate', 1)])
         user_tasks = [serialize_doc(task) for task in cursor]
         return jsonify(user_tasks)
-        # --- MODIFICATION END ---
 
 @app.route('/api/tasks/<task_id>', methods=['PUT', 'DELETE'])
 @login_required
 def handle_single_task(task_id):
-    # ... (unchanged)
     if db is None: return jsonify({"error": "Database connection is not available"}), 500
     user_id, task_oid = ObjectId(current_user.id), ObjectId(task_id)
     task = db.tasks.find_one({'_id': task_oid, 'user_id': user_id})
     if not task: return jsonify({'error': 'Task not found or not authorized'}), 404
+
     if request.method == 'PUT':
-        new_status = not task.get('completed', False)
-        db.tasks.update_one({'_id': task_oid}, {'$set': {'completed': new_status}})
+        # --- MODIFICATION START: Handle recurring tasks logic ---
+        recurrence = task.get('recurrence', 'none')
+        if recurrence != 'none' and task.get('dueDate'):
+            try:
+                current_due_date = datetime.fromisoformat(task['dueDate'].replace('Z', '+00:00'))
+                if recurrence == 'daily': next_due_date = current_due_date + timedelta(days=1)
+                elif recurrence == 'weekly': next_due_date = current_due_date + timedelta(weeks=1)
+                elif recurrence == 'monthly': next_due_date = current_due_date + relativedelta(months=1)
+                else: next_due_date = None
+                
+                if next_due_date:
+                    db.tasks.update_one({'_id': task_oid}, {'$set': {'dueDate': next_due_date.isoformat().replace('+00:00', 'Z')}})
+                else: # Fallback for unknown rule
+                    db.tasks.update_one({'_id': task_oid}, {'$set': {'completed': True}})
+            except (ValueError, TypeError):
+                 db.tasks.update_one({'_id': task_oid}, {'$set': {'completed': True}})
+        else:
+            new_status = not task.get('completed', False)
+            db.tasks.update_one({'_id': task_oid}, {'$set': {'completed': new_status}})
+        
         updated_task = db.tasks.find_one({'_id': task_oid})
         return jsonify(serialize_doc(updated_task)), 200
+        # --- MODIFICATION END ---
     elif request.method == 'DELETE':
         db.tasks.delete_one({'_id': task_oid})
         return '', 204

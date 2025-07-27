@@ -1,16 +1,26 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    // --- AUTHENTICATION CHECK ---
     try {
         const statusResponse = await fetch('/api/status');
-        if (!statusResponse.ok) throw new Error('Not logged in');
+        if (statusResponse.status === 401) { // Unauthorized
+            window.location.href = '/login.html';
+            return;
+        }
         const statusData = await statusResponse.json();
-        if (!statusData.logged_in) throw new Error('Not logged in');
+        if (!statusData.logged_in) {
+            window.location.href = '/login.html';
+            return;
+        }
+        // If logged in, initialize the app
         initializeApp(statusData.user);
     } catch (error) {
+        console.error("Auth check failed, redirecting to login.", error);
         window.location.href = '/login.html';
     }
 });
 
 function initializeApp(user) {
+    // --- Element Selectors ---
     const taskInput = document.getElementById('task-input');
     const addTaskBtn = document.getElementById('add-task-btn');
     const taskList = document.getElementById('task-list');
@@ -24,30 +34,30 @@ function initializeApp(user) {
     const searchInput = document.getElementById('search-input');
     const filterButtons = document.querySelectorAll('.filter-btn');
     const sortSelect = document.getElementById('sort-select');
+    const taskRecurrence = document.getElementById('task-recurrence');
     const API_URL = '/api/tasks';
 
+    // --- State Variables ---
     let currentFilter = 'all';
     let currentSort = 'default';
     let currentSearchTerm = '';
 
+    // --- INITIALIZE UI ---
     usernameDisplay.textContent = user.username;
 
+    // --- THEME SWITCHER ---
     function applyTheme(theme) {
         body.classList.toggle('dark-theme', theme === 'dark');
         themeToggleBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
     }
-    themeToggleBtn.addEventListener('click', () => {
-        const newTheme = body.classList.contains('dark-theme') ? 'light' : 'dark';
-        localStorage.setItem('theme', newTheme);
-        applyTheme(newTheme);
-    });
-    applyTheme(localStorage.getItem('theme') || 'light');
 
-    logoutBtn.addEventListener('click', async () => {
+    // --- LOGOUT ---
+    async function handleLogout() {
         await fetch('/api/logout', { method: 'POST' });
         window.location.href = '/login.html';
-    });
+    }
 
+    // --- CORE APP LOGIC ---
     async function fetchTasks() {
         const params = new URLSearchParams({
             filter: currentFilter,
@@ -57,10 +67,9 @@ function initializeApp(user) {
         const requestUrl = `${API_URL}?${params.toString()}`;
         try {
             const response = await fetch(requestUrl);
-            if (!response.ok) throw new Error('Failed to fetch tasks');
             const tasks = await response.json();
             renderTaskList(tasks);
-        } catch (error) { console.error(error); }
+        } catch (error) { console.error('Fetch error:', error); }
     }
 
     function renderTaskList(tasks) {
@@ -83,12 +92,19 @@ function initializeApp(user) {
         }
         const formattedDueDate = dueDate ? `${dueDate.toLocaleDateString()} ${dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not set';
 
+        const recurrenceIcon = task.recurrence && task.recurrence !== 'none'
+            ? `<span class="recurrence-icon" title="Repeats ${task.recurrence}">🔄</span>`
+            : '';
+
         const subtasksHtml = `<div class="subtask-list">${(task.subtasks || []).map(st => createSubtaskElement(st).outerHTML).join('')}</div>`;
 
         taskElement.innerHTML = `
             <div class="task-main-content">
                 <span class="task-complete-btn"></span>
-                <span class="task-text">${escapeHtml(task.text)}</span>
+                <div class="task-text-container">
+                    <span class="task-text">${escapeHtml(task.text)}</span>
+                    ${recurrenceIcon}
+                </div>
                 <span class="task-duedate">${formattedDueDate}</span>
                 <span class="task-priority"><span class="priority-label">${priority.charAt(0).toUpperCase() + priority.slice(1)}</span></span>
                 <div class="task-actions">
@@ -115,7 +131,11 @@ function initializeApp(user) {
     async function addTask() {
         const taskText = taskInput.value.trim();
         if (!taskText) return;
-        const taskData = { text: taskText, priority: taskPriority.value };
+        const taskData = {
+            text: taskText,
+            priority: taskPriority.value,
+            recurrence: taskRecurrence.value
+        };
         const dueDate = taskDueDate.value;
         const dueTime = taskDueTime.value;
         if (dueDate) {
@@ -132,6 +152,7 @@ function initializeApp(user) {
             taskDueDate.value = '';
             taskDueTime.value = '';
             taskPriority.value = 'medium';
+            taskRecurrence.value = 'none';
             taskInput.focus();
         } catch (error) { console.error(error); }
     }
@@ -170,9 +191,30 @@ function initializeApp(user) {
         return str?.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])) || '';
     }
 
-    addTaskBtn.addEventListener('click', addTask);
-    taskInput.addEventListener('keypress', (e) => e.key === 'Enter' && addTask());
+    // --- MODIFICATION START: Event Listeners ---
+    // Apply saved theme on initial load
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(savedTheme);
 
+    // Theme toggle button
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = body.classList.contains('dark-theme') ? 'light' : 'dark';
+        localStorage.setItem('theme', currentTheme);
+        applyTheme(currentTheme);
+    });
+
+    // Logout button
+    logoutBtn.addEventListener('click', handleLogout);
+
+    // Add Task button and Enter key
+    addTaskBtn.addEventListener('click', addTask);
+    taskInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addTask();
+        }
+    });
+    
+    // Filter, Sort, and Search controls
     searchInput.addEventListener('input', () => {
         currentSearchTerm = searchInput.value;
         fetchTasks();
@@ -192,14 +234,19 @@ function initializeApp(user) {
         fetchTasks();
     });
     
+    // Event delegation for the entire task list
     taskList.addEventListener('click', (event) => {
         const target = event.target;
         const taskItem = target.closest('.task-item');
         if (!taskItem) return;
         const taskId = taskItem.dataset.id;
         
-        if (target.classList.contains('task-complete-btn')) toggleCompletion(taskId);
-        if (target.classList.contains('task-delete-btn')) deleteTask(taskId);
+        if (target.classList.contains('task-complete-btn')) {
+            toggleCompletion(taskId);
+        }
+        if (target.classList.contains('task-delete-btn')) {
+            deleteTask(taskId);
+        }
         if (target.classList.contains('add-subtask-btn')) {
             const form = taskItem.querySelector('.add-subtask-form');
             form.style.display = form.style.display === 'none' ? 'flex' : 'none';
@@ -213,10 +260,15 @@ function initializeApp(user) {
         const subtaskItem = target.closest('.subtask-item');
         if (subtaskItem) {
             const subtaskId = subtaskItem.dataset.subtaskId;
-            if (target.classList.contains('subtask-complete-btn')) toggleCompletion(taskId, subtaskId);
-            if (target.classList.contains('subtask-delete-btn')) deleteTask(taskId, subtaskId);
+            if (target.classList.contains('subtask-complete-btn')) {
+                toggleCompletion(taskId, subtaskId);
+            }
+            if (target.classList.contains('subtask-delete-btn')) {
+                deleteTask(taskId, subtaskId);
+            }
         }
     });
+    // --- MODIFICATION END ---
     
-    fetchTasks();
+    fetchTasks(); // Initial fetch of tasks for the logged-in user
 }
